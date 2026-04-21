@@ -2,6 +2,7 @@ package main
 
 import (
 	"image/color"
+	"sync"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -17,6 +18,7 @@ var (
 	green    = color.RGBA{10, 255, 50, 255}
 	boids    [boidCount]*boid
 	boidsMap [screenWidth + 1][screenHeight + 1]int //所有boid的位置索引  填充值为boid.id
+	lock     = sync.RWMutex{}
 )
 
 type Game struct{}
@@ -27,10 +29,12 @@ func (g *Game) Update() error {
 
 func (g *Game) Draw(screen *ebiten.Image) {
 	for _, boid := range boids {
+		lock.RLock()
 		screen.Set(int(boid.position.x+1), int(boid.position.y), green)
 		screen.Set(int(boid.position.x-1), int(boid.position.y), green)
 		screen.Set(int(boid.position.x), int(boid.position.y+1), green)
 		screen.Set(int(boid.position.x), int(boid.position.y-1), green)
+		lock.RUnlock()
 	}
 }
 

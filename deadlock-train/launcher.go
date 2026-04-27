@@ -5,8 +5,8 @@ import (
 	"sync"
 
 	"github.com/hajimehoshi/ebiten"
+	. "github.com/inmself/deadlock-train/arbitrator"
 	. "github.com/inmself/deadlock-train/common"
-	. "github.com/inmself/deadlock-train/deadlock"
 )
 
 var (

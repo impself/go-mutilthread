@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Barrier Pattern Visualization</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: 'Consolas', 'Courier New', monospace;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px;
+    min-height: 100vh;
+  }
+  h1 {
+    font-size: 22px;
+    margin-bottom: 8px;
+    color: #eee;
+  }
+  .subtitle {
+    font-size: 13px;
+    color: #888;
+    margin-bottom: 24px;
+  }
+  #timeline {
+    position: relative;
+    width: 820px;
+    margin-bottom: 20px;
+  }
+  .lane {
+    display: flex;
+    align-items: center;
+    height: 50px;
+    margin-bottom: 6px;
+  }
+  .lane-label {
+    width: 80px;
+    text-align: right;
+    padding-right: 16px;
+    font-weight: bold;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .lane-label.red { color: #ff6b6b; }
+  .lane-label.blue { color: #4ecdc4; }
+  .lane-track {
+    position: relative;
+    flex: 1;
+    height: 36px;
+    background: #16213e;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .segment {
+    position: absolute;
+    top: 4px;
+    height: 28px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: #fff;
+    opacity: 0;
+    transition: opacity 0.3s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 0 6px;
+  }
+  .segment.visible { opacity: 1; }
+  .segment.running-red {
+    background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+  }
+  .segment.running-blue {
+    background: linear-gradient(135deg, #4ecdc4, #0abde3);
+  }
+  .segment.waiting-red {
+    background: repeating-linear-gradient(
+      45deg,
+      #cc3333,
+      #cc3333 4px,
+      #992222 4px,
+      #992222 8px
+    );
+  }
+  .segment.waiting-blue {
+    background: repeating-linear-gradient(
+      45deg,
+      #2e8b8b,
+      #2e8b8b 4px,
+      #1a6666 4px,
+      #1a6666 8px
+    );
+  }
+  .time-axis {
+    display: flex;
+    align-items: center;
+    height: 24px;
+    margin-left: 80px;
+    position: relative;
+  }
+  .time-tick {
+    position: absolute;
+    font-size: 11px;
+    color: #666;
+    transform: translateX(-50%);
+  }
+  .barrier-line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #f39c12;
+    opacity: 0;
+    transition: opacity 0.3s;
+    z-index: 2;
+    pointer-events: none;
+  }
+  .barrier-line.visible {
+    opacity: 0.8;
+    animation: flash 0.5s ease-in-out;
+  }
+  @keyframes flash {
+    0% { background: #f1c40f; width: 4px; }
+    100% { background: #f39c12; width: 2px; }
+  }
+  .barrier-label {
+    position: absolute;
+    top: -18px;
+    font-size: 10px;
+    color: #f39c12;
+    transform: translateX(-50%);
+    white-space: nowrap;
+  }
+  #controls {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  button {
+    background: #16213e;
+    color: #e0e0e0;
+    border: 1px solid #333;
+    padding: 8px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    transition: background 0.2s;
+  }
+  button:hover { background: #1f3460; }
+  button:disabled { opacity: 0.4; cursor: default; }
+  #status {
+    font-size: 13px;
+    color: #aaa;
+    margin-bottom: 16px;
+    height: 20px;
+  }
+  #log {
+    width: 820px;
+    max-height: 200px;
+    overflow-y: auto;
+    background: #16213e;
+    border-radius: 6px;
+    padding: 12px 16px;
+    font-size: 12px;
+    line-height: 1.8;
+    border: 1px solid #2a2a4a;
+  }
+  #log::-webkit-scrollbar { width: 6px; }
+  #log::-webkit-scrollbar-track { background: transparent; }
+  #log::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+  .log-red { color: #ff6b6b; }
+  .log-blue { color: #4ecdc4; }
+  .log-barrier { color: #f39c12; }
+  .legend {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 16px;
+    font-size: 12px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .legend-box {
+    width: 24px;
+    height: 14px;
+    border-radius: 3px;
+  }
+  .legend-box.r-red { background: linear-gradient(135deg, #ff6b6b, #ee5a24); }
+  .legend-box.r-blue { background: linear-gradient(135deg, #4ecdc4, #0abde3); }
+  .legend-box.w-red { background: repeating-linear-gradient(45deg, #cc3333, #cc3333 4px, #992222 4px, #992222 8px); }
+  .legend-box.w-blue { background: repeating-linear-gradient(45deg, #2e8b8b, #2e8b8b 4px, #1a6666 4px, #1a6666 8px); }
+  .legend-box.barrier { background: #f39c12; width: 2px; height: 18px; }
+</style>
+</head>
+<body>
+
+<h1>Barrier Synchronization Pattern</h1>
+<p class="subtitle">red (sleep=2s) vs blue (sleep=4s) | barrier size=2 | total=20s</p>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-box r-red"></div> Running</div>
+  <div class="legend-item"><div class="legend-box w-red"></div> Waiting</div>
+  <div class="legend-item"><div class="legend-box barrier"></div> Barrier Release</div>
+</div>
+
+<div id="controls">
+  <button id="btnPlay" onclick="startAnim()">Play</button>
+  <button id="btnPause" onclick="pauseAnim()" disabled>Pause</button>
+  <button id="btnReset" onclick="resetAnim()">Reset</button>
+  <span style="align-self:center;font-size:12px;color:#666">Speed:
+    <input type="range" id="speedSlider" min="1" max="5" value="2" style="vertical-align:middle;width:80px">
+  </span>
+</div>
+
+<div id="status"></div>
+
+<div id="timeline">
+  <div class="lane">
+    <div class="lane-label red">red</div>
+    <div class="lane-track" id="trackRed"></div>
+  </div>
+  <div class="lane">
+    <div class="lane-label blue">blue</div>
+    <div class="lane-track" id="trackBlue"></div>
+  </div>
+  <div class="time-axis" id="timeAxis"></div>
+</div>
+
+<div id="log"></div>
+
+<script>
+const TOTAL_TIME = 20;
+const TRACK_W = 740;
+const RED_SLEEP = 2;
+const BLUE_SLEEP = 4;
+
+let animTimer = null;
+let currentTime = 0;
+let paused = false;
+
+// Simulate barrier timeline
+function simulate() {
+  const events = [];
+  let redT = 0, blueT = 0;
+  let redArrival, blueArrival;
+  let round = 0;
+
+  while (redT < TOTAL_TIME || blueT < TOTAL_TIME) {
+    // Both start running from their current time
+    redArrival = redT + RED_SLEEP;
+    blueArrival = blueT + BLUE_SLEEP;
+
+    // Red segment: running
+    if (redT < TOTAL_TIME) {
+      events.push({ thread: 'red', type: 'running', start: redT, end: Math.min(redArrival, TOTAL_TIME) });
+    }
+    // Blue segment: running
+    if (blueT < TOTAL_TIME) {
+      events.push({ thread: 'blue', type: 'running', start: blueT, end: Math.min(blueArrival, TOTAL_TIME) });
+    }
+
+    let barrierTime = Math.max(redArrival, blueArrival);
+    let waiter = redArrival < blueArrival ? 'red' : 'blue';
+    let earlyArrival = Math.min(redArrival, blueArrival);
+
+    // Waiting segment for early arriver
+    if (earlyArrival < barrierTime && earlyArrival < TOTAL_TIME) {
+      if (barrierTime <= TOTAL_TIME) {
+        events.push({ thread: waiter, type: 'waiting', start: earlyArrival, end: barrierTime });
+      } else {
+        events.push({ thread: waiter, type: 'waiting', start: earlyArrival, end: TOTAL_TIME });
+      }
+    }
+
+    if (barrierTime <= TOTAL_TIME) {
+      round++;
+      events.push({ type: 'barrier', time: barrierTime, round });
+    }
+
+    redT = barrierTime;
+    blueT = barrierTime;
+
+    if (barrierTime > TOTAL_TIME) break;
+  }
+  return events;
+}
+
+function toX(t) {
+  return (t / TOTAL_TIME) * TRACK_W;
+}
+
+const events = simulate();
+const barrierEvents = events.filter(e => e.type === 'barrier');
+
+function buildTimeline() {
+  const trackRed = document.getElementById('trackRed');
+  const trackBlue = document.getElementById('trackBlue');
+  const timeAxis = document.getElementById('timeAxis');
+
+  // Time ticks
+  for (let t = 0; t <= TOTAL_TIME; t += 2) {
+    const tick = document.createElement('div');
+    tick.className = 'time-tick';
+    tick.style.left = toX(t) + 'px';
+    tick.textContent = t + 's';
+    timeAxis.appendChild(tick);
+  }
+
+  // Segments
+  events.forEach((e, i) => {
+    if (e.type === 'barrier') {
+      // Barrier line in both tracks
+      ['trackRed', 'trackBlue'].forEach(id => {
+        const line = document.createElement('div');
+        line.className = 'barrier-line';
+        line.id = 'barrier-' + e.round + '-' + id;
+        line.style.left = toX(e.time) + 'px';
+
+        const label = document.createElement('div');
+        label.className = 'barrier-label';
+        label.textContent = 'B' + e.round;
+        label.style.left = '0px';
+        line.appendChild(label);
+
+        document.getElementById(id).appendChild(line);
+      });
+      return;
+    }
+
+    const seg = document.createElement('div');
+    const color = e.type === 'running' ? 'running-' + e.thread : 'waiting-' + e.thread;
+    seg.className = 'segment ' + color;
+    seg.id = 'seg-' + i;
+    seg.style.left = toX(e.start) + 'px';
+    seg.style.width = Math.max(toX(e.end) - toX(e.start) - 1, 4) + 'px';
+    seg.textContent = e.type === 'running' ? 'run' : 'wait';
+    (e.thread === 'red' ? trackRed : trackBlue).appendChild(seg);
+  });
+}
+
+function getSpeed() {
+  return [2000, 1000, 500, 250, 100][document.getElementById('speedSlider').value - 1];
+}
+
+function startAnim() {
+  if (animTimer) return;
+  document.getElementById('btnPlay').disabled = true;
+  document.getElementById('btnPause').disabled = false;
+  paused = false;
+  tick();
+}
+
+function tick() {
+  if (paused) return;
+  if (currentTime > TOTAL_TIME) {
+    stopAnim();
+    return;
+  }
+
+  document.getElementById('status').textContent = 't = ' + currentTime.toFixed(1) + 's';
+
+  // Show segments that have started
+  events.forEach((e, i) => {
+    if (e.type === 'barrier') {
+      const el1 = document.getElementById('barrier-' + e.round + '-trackRed');
+      const el2 = document.getElementById('barrier-' + e.round + '-trackBlue');
+      if (e.time <= currentTime) {
+        if (el1) el1.classList.add('visible');
+        if (el2) el2.classList.add('visible');
+      }
+    } else {
+      const el = document.getElementById('seg-' + i);
+      if (el && e.start <= currentTime) el.classList.add('visible');
+    }
+  });
+
+  // Log events at this time
+  events.forEach(e => {
+    if (e.type === 'barrier' && Math.abs(e.time - currentTime) < 0.05) {
+      appendLog(`<span class="log-barrier">t=${e.time}s | Barrier #${e.round} - both threads released</span>`);
+    } else if (e.type !== 'barrier' && Math.abs(e.start - currentTime) < 0.05) {
+      const cls = e.thread === 'red' ? 'log-red' : 'log-blue';
+      appendLog(`<span class="${cls}">t=${e.start}s | ${e.thread} ${e.type === 'running' ? 'starts running (sleep ' + (e.thread === 'red' ? RED_SLEEP : BLUE_SLEEP) + 's)' : 'waiting on barrier'}</span>`);
+    }
+  });
+
+  currentTime += 0.2;
+  animTimer = setTimeout(tick, getSpeed() / 5);
+}
+
+function appendLog(html) {
+  const log = document.getElementById('log');
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+function pauseAnim() {
+  paused = true;
+  clearTimeout(animTimer);
+  animTimer = null;
+  document.getElementById('btnPlay').disabled = false;
+  document.getElementById('btnPause').disabled = true;
+  document.getElementById('status').textContent += ' (paused)';
+}
+
+function stopAnim() {
+  clearTimeout(animTimer);
+  animTimer = null;
+  document.getElementById('btnPlay').disabled = true;
+  document.getElementById('btnPause').disabled = true;
+  document.getElementById('status').textContent = 'Done';
+}
+
+function resetAnim() {
+  clearTimeout(animTimer);
+  animTimer = null;
+  paused = false;
+  currentTime = 0;
+  document.getElementById('btnPlay').disabled = false;
+  document.getElementById('btnPause').disabled = true;
+  document.getElementById('status').textContent = '';
+  document.getElementById('log').innerHTML = '';
+  document.querySelectorAll('.segment').forEach(el => el.classList.remove('visible'));
+  document.querySelectorAll('.barrier-line').forEach(el => el.classList.remove('visible'));
+}
+
+buildTimeline();
+</script>
+</body>
+</html>
